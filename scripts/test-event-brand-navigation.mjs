@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {load,sql} from './test-fixture.mjs';
+const {runEventLogo,eventLogoVideo,eventStageVideo,wordmarkHoldMs}=await load('lib/event-logo.ts');
+const {pathRoute,routePath,myChallengesLoginPath,isCollectionRoute}=await load('lib/routes.ts');
+const mine='/challenges?tab=mine';
+assert.equal(routePath('mine'),mine);
+for(const path of [mine,'/my-challenges','/my-challenges/','/challenges/?tab=mine','/challenges?sort=x&tab=mine#cards'])assert.equal(pathRoute(path),'mine');
+for(const path of ['/challenges','/challenges?tab=other'])assert.equal(pathRoute(path),'wall');
+assert.equal(pathRoute(new URL(myChallengesLoginPath,'https://site.test').searchParams.get('next')),'mine');
+assert.equal(pathRoute('/challenge/example-1?ref=library'),'challenge/example-1');
+assert.equal(pathRoute('https://external.test/challenges?tab=mine'),'not-found');
+assert(isCollectionRoute('mine')&&isCollectionRoute('wall')&&!isCollectionRoute('new'));
+const {mock}=await import('node:test');mock.timers.enable({apis:['setTimeout']});
+const doc=new EventTarget(),motion=new EventTarget(),net=new EventTarget();motion.matches=false;doc.hidden=false;
+let alpha=0;doc.createElement=()=>({getContext:()=>({drawImage(){},getImageData(){return {data:[0,0,0,alpha]};}})});
+globalThis.document=doc;globalThis.window={matchMedia:()=>motion};Object.defineProperty(globalThis,'navigator',{configurable:true,value:{connection:net}});
+function setup(placement,supported=true,reject=false){
+ const v=new EventTarget();v.canPlayType=()=>supported?'probably':'';v.hasAttribute=()=>!!v.src;v.removeAttribute=()=>delete v.src;v.load=()=>{};
+ v.paused=true;v.duration=6.5;v.currentTime=0;v.readyState=4;v.plays=0;v.pause=()=>{v.paused=true;};
+ v.play=()=>{v.plays++;v.paused=false;return reject?Promise.reject(new Error('Autoplay blocked')):Promise.resolve();};
+ const shown=[];return {v,shown,off:runEventLogo(v,placement,x=>shown.push(x))||(()=>{})};
+}
+const home=setup('masthead');mock.timers.tick(wordmarkHoldMs-1);assert.equal(home.v.src,undefined);
+mock.timers.tick(1);assert.equal(home.v.src,eventLogoVideo);assert.equal(home.v.playbackRate,1.5);assert.equal(wordmarkHoldMs,2000);assert(!home.shown.at(-1));home.v.dispatchEvent(new Event('playing'));assert(home.shown.at(-1));assert(!home.v.loop);
+home.v.currentTime=6.5;home.v.dispatchEvent(new Event('ended'));assert(!home.shown.at(-1));mock.timers.tick(wordmarkHoldMs);assert.equal(home.v.plays,2);assert.equal(home.v.currentTime,0);
+doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));assert(home.v.paused);mock.timers.tick(30000);assert.equal(home.v.plays,2);
+doc.hidden=false;doc.dispatchEvent(new Event('visibilitychange'));mock.timers.tick(wordmarkHoldMs);assert.equal(home.v.plays,3);home.off();
+const deck=setup('presentation');assert(deck.v.loop);assert.equal(deck.v.src,eventStageVideo);assert.equal(deck.v.playbackRate,1);assert.equal(deck.v.plays,1);deck.v.dispatchEvent(new Event('playing'));assert(deck.shown.at(-1));deck.off();
+const incompatible=setup('presentation',false);assert.equal(incompatible.v.plays,0);incompatible.off();
+motion.matches=true;const reduced=setup('presentation');assert(!reduced.v.src);mock.timers.tick(30000);assert.equal(reduced.v.plays,0);reduced.off();motion.matches=false;
+alpha=255;const opaque=setup('presentation');opaque.v.dispatchEvent(new Event('playing'));assert(opaque.v.paused);assert(!opaque.shown.includes(true));opaque.off();alpha=0;
+const blocked=setup('masthead',true,true);mock.timers.tick(wordmarkHoldMs);await Promise.resolve();assert(blocked.v.paused);assert(!blocked.shown.includes(true));blocked.off();
+mock.timers.reset();sql.close();
+console.log('PASS: preserved library and login deep links; repeated end-driven logo cycles, no early fade, hidden-page pause, looping display, reduced motion, opaque WebM and autoplay fallbacks.');

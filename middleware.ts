@@ -1,0 +1,2 @@
+import {NextResponse,type NextRequest} from 'next/server';
+export function middleware(request:NextRequest){const response=NextResponse.next();if(!request.nextUrl.pathname.startsWith('/assets/')&&!request.nextUrl.pathname.startsWith('/brand/')&&!request.nextUrl.pathname.startsWith('/fonts/')&&!request.nextUrl.pathname.startsWith('/covers/'))response.headers.set('Cache-Control','private, no-store');return response;}

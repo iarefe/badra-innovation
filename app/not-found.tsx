@@ -1,0 +1,1 @@
+export default function NotFound(){return <main className="empty wrap" style={{minHeight:'70vh',paddingTop:100}}><span className="eyebrow">هاكاثون الابتكار الرقمي</span><h1>الصفحة غير متاحة</h1><p>يمكنك العودة إلى الرئيسية واستعراض التحديات.</p><a className="button dark" href="/">العودة للرئيسية</a></main>}

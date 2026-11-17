@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {load,sql} from './test-fixture.mjs';
+const {filterAdminChallenges:f}=await load('lib/admin-challenge-list.ts');
+const entry=(id,createdAt,votes,interestCount,roles,status='published')=>({id,createdAt,votes,interestCount,status,challenge:{title:'تحدي '+id,author:'أحمد'},interestedMembers:roles.map(roles=>({name:'نفس الاسم',roles}))});
+const input=[entry('a',100,9,2,[['developer','innovator'],[]]),entry('b',200,3,5,[['creative']]),entry('c',300,9,0,[],'draft'),{...entry('example',400,100,100,[]),example:true}];
+assert.deepEqual(f(input,'all','','all','votes').map(e=>e.id),['c','a','b']);
+assert.deepEqual(f(input,'all','','all','interests').map(e=>e.id),['b','a','c']);
+assert.deepEqual(f(input,'published','احمد','developer','newest').map(e=>e.id),['a']);
+assert.equal(f(input,'all','','challenger','newest').length,0);
+assert.deepEqual(f(input,'all','','unspecified','newest').map(e=>e.id),['a']);
+assert.equal(f(input,'all','','developer','votes')[0].interestCount,2,'Filter does not change totals');
+assert.deepEqual(f(input,'all','','all','newest',true).map(e=>e.id),['b','a']);
+assert.equal(input[0].id,'a','No in-place sorting');
+assert.equal(f(input,'all','غير موجود','all','newest').length,0);
+const tied=[entry('z',1,1,1,[]),entry('a',1,1,1,[])];assert.deepEqual(f(tied,'all','','all','votes').map(e=>e.id),['a','z']);
+const missing=[{...entry('missing',1,2,2,[]),interestedMembers:undefined}];assert.equal(f(missing,'all','','all','votes').length,1);assert.equal(f(missing,'all','','unspecified','votes').length,0,'Missing names are not assumed to have unspecified roles');
+sql.close();console.log('PASS: admin challenge sorting, stable ties, Arabic search, role filtering, missing data, unchanged totals and immutable inputs.');

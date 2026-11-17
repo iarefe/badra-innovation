@@ -1,0 +1,15 @@
+'use client';
+import {UserPlus,Check,ThumbsUp,Lock} from 'lucide-react';
+import {Entry,voteLabel} from '@/lib/challenges';
+import {RoleTags} from './participation-badges';
+import MotionAction from './motion-action';
+export default function ChallengeEngagement({entry:e,signedIn,manager,votingOpen,joiningOpen,busy,onAction}:{entry:Entry;signedIn:boolean;manager:boolean;votingOpen:boolean;joiningOpen:boolean;busy:boolean;onAction:(action:'vote'|'interest')=>void}){
+ if(e.example||e.status!=='published')return null;
+ return <section className="challenge-engagement" aria-label="التصويت ورغبات الانضمام">{e.mine?<div className="owner-participation-note"><p>أنت صاحب هذا التحدي.</p><span>يمكنك التصويت وتسجيل رغبتك بالانضمام إلى تحديات الآخرين.</span></div>:<><div className="engagement-options">
+  <div><MotionAction key={e.id+'-vote'} data-companion-target="vote" className={'button '+(e.voted?'dark':'ghost')} selected={e.voted} count={manager?e.votes:undefined} disabled={busy||!votingOpen} onClick={()=>onAction('vote')}>{!votingOpen?<Lock size={18}/>:e.voted?<Check size={18}/>:<ThumbsUp size={18}/>} {!votingOpen?'التصويت مغلق':voteLabel(e)}</MotionAction><p>{votingOpen?'صوتك يرفع أولوية التحدي للترشيح.':'التصويت مغلق حاليًا.'}</p></div>
+  <div><MotionAction key={e.id+'-interest'} data-companion-target="interest" className={'button '+(e.interested?'interest-selected':'ghost')} selected={!!e.interested} count={manager?e.interestCount:undefined} disabled={busy||!joiningOpen} onClick={()=>onAction('interest')}>{e.interested?<Check size={18}/>:<UserPlus size={18}/>} {!joiningOpen?'الانضمام مغلق':e.interested?'سجّلت رغبتي بالانضمام':'أرغب بالانضمام'}</MotionAction><p>{joiningOpen?'سجّل رغبتك في العمل على هذا التحدي؛ يطّلع المدير على اسمك وأدوارك لتوزيع الفرق.':'الانضمام مغلق حاليًا، والرغبات السابقة محفوظة.'}</p></div>
+ </div><p className="engagement-help">يمكنك التصويت وتسجيل رغبتك بالانضمام معًا أو اختيار أحدهما. عند فتح المشاركة، النقر مجددًا يلغي اختيارك{!votingOpen?'، مع بقاء الأصوات ثابتة أثناء إغلاق التصويت':''}. تسجيل الرغبة لا يؤثر في الترشيح؛ يعتمد مدير الهاكاثون توزيع الفرق لاحقًا.</p></>}
+ {manager?<div className="engagement-lists"><details><summary>المصوّتون <span>{(e.votes||0).toLocaleString('ar-SA')}</span></summary><p>هذه الأصوات هي التي تؤثر في ترشيح التحدي.</p>{e.voters?.length?<ul>{e.voters.map((person,i)=><li key={i}>{person.name}</li>)}</ul>:<p className="muted">لا توجد أصوات بعد.</p>}</details>
+ <details><summary>الراغبون بالانضمام <span>{(e.interestCount||0).toLocaleString('ar-SA')}</span></summary><p>رغبات المشاركة والأدوار التي يمكن لكل شخص تقديمها.</p>{e.interestedMembers?.length?<ul>{e.interestedMembers.map((person,i)=><li key={i}><b>{person.name}</b><RoleTags roles={person.roles}/></li>)}</ul>:<p className="muted">لم يسجّل أحد رغبته بالانضمام بعد.</p>}</details></div>:!signedIn&&(votingOpen||joiningOpen)?<p className="fine"><a className="text-link" href={'/login?next='+encodeURIComponent('/challenge/'+e.id)}>سجّل دخولك للتصويت وتسجيل رغبتك بالانضمام</a></p>:null}
+ </section>;
+}

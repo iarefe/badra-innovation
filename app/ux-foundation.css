@@ -1,0 +1,29 @@
+/* Shared interaction contract for Badra's Arabic event surfaces. */
+:root {
+  --bz-primary:#23484a;
+  --bz-ink:#1d2b2a;
+  --bz-muted:#5f6b68;
+  --bz-accent-ink:#9a4f20;
+  --bz-accent-action:#a9561f;
+  --bz-surface:#fafaf7;
+  --bz-border-control:#788781;
+  --bz-success:#3f6b4a;
+  --bz-error:#b23a2a;
+  --bz-focus:#23484a;
+  --bz-action-size:44px;
+  --bz-font:"Dossier Plex","IBM Plex Sans Arabic",Tahoma,sans-serif;
+}
+.registration-card input:is([type=tel],.verification-code){
+  display:block;box-sizing:border-box;width:100%;max-width:100%;
+  min-height:48px;border:1.5px solid var(--bz-border-control);border-radius:10px;
+  background:#fff;color:var(--bz-ink);font:inherit;font-size:16px;padding:9px 12px;
+}
+.registration-card input[aria-invalid=true]{border-color:var(--bz-error)}
+.registration-card .bz-entry-hint,.registration-card .bz-entry-error{display:block;font-size:14px;line-height:1.65;margin-block:4px 10px}
+.registration-card .bz-entry-hint{color:var(--bz-muted)}
+.registration-card .bz-entry-error{color:var(--bz-error);font-weight:600}
+.registration-card :is(.registration-back,.registration-resend button),.member-account .member-shortcut{min-block-size:var(--bz-action-size);align-content:center}
+.registration-card :is(input,button,a):focus-visible,.member-account :is(button,a,input):focus-visible{outline:3px solid var(--bz-focus);outline-offset:3px}
+.member-account .bz-workspace-shortcut{background:#f2f5ef;color:var(--bz-primary);border-radius:10px;padding-inline:12px}
+.registration-card form>label.field:has(+input){margin-block-end:4px}
+#bz-main{scroll-margin-block-start:96px}

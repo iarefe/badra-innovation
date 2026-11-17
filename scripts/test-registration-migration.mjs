@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync,readdirSync} from 'node:fs';
+const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');
+for(const f of readdirSync('drizzle').filter(f=>f.endsWith('.sql')&&f<'0005').sort())db.exec(readFileSync('drizzle/'+f,'utf8'));
+db.exec("INSERT INTO employees(id,number,phone,name,email,department,created_at) VALUES('preserved','001','+966500000001','اسم محفوظ','test@example.test','التقنية',1); INSERT INTO employee_sessions VALUES('digest','preserved',1000); INSERT INTO employee_otps(id,employee_id,digest,expires_at) VALUES('old-code','preserved','digest',1000)");
+const before=db.prepare('SELECT * FROM employees').get();
+db.exec('BEGIN');db.exec(readFileSync('drizzle/0005_abnormal_mentor.sql','utf8'));db.exec('COMMIT');
+assert.deepEqual(db.prepare('SELECT * FROM employees').get(),before);
+assert.equal(db.prepare('SELECT COUNT(*) n FROM employee_sessions').get().n,1);assert.equal(db.prepare('SELECT COUNT(*) n FROM employee_otps').get().n,1);
+assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+db.exec("INSERT INTO employees(id,phone,name,department,created_at) VALUES('new','+966500000002','اسم جديد','',2)");assert.equal(db.prepare("SELECT email FROM employees WHERE id='new'").get().email,null);
+for(const f of readdirSync('drizzle').filter(f=>f.endsWith('.sql')&&f>'0005_abnormal_mentor.sql').sort())db.exec(readFileSync('drizzle/'+f,'utf8'));
+assert.equal(db.prepare("SELECT name FROM employees WHERE id='preserved'").get().name,before.name);
+assert.equal(db.prepare("SELECT roles FROM employees WHERE id='preserved'").get().roles,'[]');
+assert.equal(db.prepare('SELECT COUNT(*) n FROM employee_sessions').get().n,1);
+assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+db.close();console.log('PASS: migration preserves legacy profiles and session/OTP references; nullable optional employee fields; no FK violations.');

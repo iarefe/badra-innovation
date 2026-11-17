@@ -1,0 +1,4 @@
+# Optional local configuration. Leave unused services blank. Never commit real values.
+MANAGER_PHONES=
+BATHRA_OTP=
+OPENAI_API_KEY=

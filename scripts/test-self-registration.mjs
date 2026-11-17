@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import {sql,load,env,req,digest,phoneFor,seedEmployee} from './test-fixture.mjs';
+const auth=await load('app/api/employee-auth/route.ts'),challenges=await load('app/api/challenges/route.ts'),admin=await load('app/api/participation/route.ts'),lib=await load('lib/challenges.ts');
+env.BATHRA_OTP='test-only';
+const originalFetch=globalThis.fetch;const sent=[];let providerValid=true;
+globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);if(url.endsWith('/send-otp')){sent.push(body);return Response.json({success:true})}assert(url.endsWith('/verify-otp'));return Response.json({status:providerValid})};
+const request=async(phone)=>{const response=await auth.POST(req(null,{action:'request',phone}));assert.equal(response.status,202);const d=await response.json();return {id:d.id,code:sent.at(-1).otp}};
+const verify=async(code)=>{const response=await auth.POST(req(null,{action:'verify',...code}));assert.equal(response.status,200);const session={secret:response.headers.get('Set-Cookie').split(';')[0].split('=')[1]};return {session,data:await response.json()}};
+const mobile=phoneFor('201');const code=await request(mobile);
+assert.equal(sql.prepare('SELECT COUNT(*) n FROM employees').get().n,0,'No account before phone verification');
+assert.equal((await auth.POST(req(null,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'مشارك جديد',phone:mobile}))).status,401);
+providerValid=false;assert.equal((await auth.POST(req(null,{action:'verify',...code}))).status,400);assert.equal(sql.prepare('SELECT COUNT(*) n FROM employees').get().n,0);providerValid=true;
+const {session,data}=await verify(code);assert.equal(data.needsName,true);
+let record=sql.prepare('SELECT * FROM employees WHERE phone=?').get(mobile);assert.equal(record.name,'');assert.equal(record.number,null);assert.equal(record.email,null);
+const accountId=record.id;assert.equal((await (await auth.GET(req(session))).json()).pendingProfile.phone,mobile);
+assert.equal((await (await auth.GET(req(session))).json()).employee,null);
+const challenge=lib.exampleChallenges[0].challenge;
+assert.equal((await challenges.POST(req(session,{challenge,submit:true}))).status,401,'Pending profile cannot participate');
+assert.equal((await admin.GET(req(session))).status,403,'OTP cannot grant manager role');
+assert.equal((await auth.POST(req(session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'أ'}))).status,400);
+assert.equal((await auth.POST(req(session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'  '}))).status,400);
+assert.equal((await auth.POST(req(session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'1234'}))).status,400);
+assert.equal((await auth.POST(req(session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'مشارك جديد'},'POST',{origin:'https://evil.test'}))).status,403);
+assert.equal((await auth.POST(req(session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'  مشارك جديد  ',phone:phoneFor('202'),id:'ignored'},'POST',{ip:'198.51.100.3'}))).status,200);
+record=sql.prepare('SELECT * FROM employees WHERE id=?').get(accountId);assert.equal(record.name,'مشارك جديد');assert.equal(record.phone,mobile);
+assert.equal((await auth.POST(req(session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'اسم بديل'}))).status,409,'Name cannot be overwritten through onboarding');
+let state=await (await auth.GET(req(session))).json();assert.equal(state.pendingProfile,null);assert.equal(state.employee.name,'مشارك جديد');
+const added=await challenges.POST(req(session,{challenge,submit:true}));assert.equal(added.status,200);const challengeId=(await added.json()).id;
+
+const colleague=seedEmployee('204');const otherChallenge=await challenges.POST(req(colleague,{challenge,submit:true}));const voteChallengeId=(await otherChallenge.json()).id;
+assert.equal((await challenges.PATCH(req(session,{id:voteChallengeId,action:'vote',active:true},'PATCH'))).status,200);
+await auth.POST(req(session,{action:'logout'}));assert.equal(await (await auth.GET(req(session))).json().then(d=>d.employee),null);
+const returning=await verify(await request('0500000201'));assert.equal(returning.data.needsName,false);assert.equal(sql.prepare('SELECT COUNT(*) n FROM employees WHERE phone=?').get(mobile).n,1);
+assert.equal((await (await auth.GET(req(returning.session))).json()).employee.name,'مشارك جديد');
+assert.equal((await challenges.PATCH(req(returning.session,{id:voteChallengeId,action:'vote',active:true},'PATCH'))).status,200);
+assert.equal(sql.prepare('SELECT COUNT(*) n FROM challenge_votes WHERE challenge_id=?').get(voteChallengeId).n,1);
+const feed=await (await challenges.GET(req(returning.session))).json();assert.equal(feed.viewer.employeeId,accountId);assert.equal(feed.viewer.employeeNumber,undefined);assert(!JSON.stringify(await (await challenges.GET(req(null))).json()).includes(mobile));
+// A second participant shares neither profile nor draft storage identity.
+const second=await verify(await request(phoneFor('202')));assert.equal(second.data.needsName,true);
+await auth.POST(req(second.session,{action:'complete-profile',department:'إدارة الاختبار',roles:['innovator','developer'],name:'مشارك آخر'}));
+const secondFeed=await (await challenges.GET(req(second.session))).json();assert.notEqual(secondFeed.viewer.employeeId,accountId);
+// Manager editing self-registered profiles does not require fake email or employee number.
+assert.equal((await admin.POST(req('manager',{action:'update',id:accountId,phone:mobile,name:'مشارك محدث',email:'',department:''}))).status,200);
+assert.equal(sql.prepare('SELECT email FROM employees WHERE id=?').get(accountId).email,null);
+assert.equal((await (await auth.GET(req(returning.session))).json()).employee,null);
+// Blocking persists; another OTP request never creates a replacement account.
+const pending=await request(mobile);assert.equal((await admin.POST(req('manager',{action:'active',id:accountId,active:false}))).status,200);
+assert.equal((await auth.POST(req(null,{action:'verify',...pending}))).status,400);
+const count=sent.length;const blocked=await request(mobile);assert.equal(sent.length,count);
+assert.equal((await auth.POST(req(null,{action:'verify',...blocked}))).status,400);
+assert.equal(sql.prepare('SELECT COUNT(*) n FROM employees WHERE phone=?').get(mobile).n,1);
+assert.equal(sql.prepare('SELECT active FROM employees WHERE id=?').get(accountId).active,0);
+globalThis.fetch=originalFetch;sql.close();console.log('PASS: self-registration after OTP only; profile required and scoped to session; name retained on returning login; phone uniqueness; no admin escalation; isolated drafts; votes retained; disabled accounts stay disabled.');

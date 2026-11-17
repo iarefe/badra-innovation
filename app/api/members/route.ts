@@ -1,0 +1,4 @@
+import {z} from 'zod';
+import {database,viewer,sameOrigin,reply,fail} from '@/lib/server/access';
+export async function GET(r:Request){try{if(!(await viewer(r)).manager)return fail('غير مسموح.',403);return reply({members:(await database().prepare('SELECT email,role FROM workshop_members ORDER BY email').all()).results});}catch{return fail('تعذّر تحميل الحسابات.',500);}}
+export async function POST(r:Request){try{if(!sameOrigin(r)||!(await viewer(r)).manager)return fail('غير مسموح.',403);const p=z.object({email:z.string().email().max(200),action:z.enum(['add','remove'])}).parse(await r.json());const email=p.email.toLowerCase().trim();if(p.action==='add')await database().prepare("INSERT OR IGNORE INTO workshop_members(email,role) VALUES(?,'employee')").bind(email).run();else await database().prepare("DELETE FROM workshop_members WHERE email=? AND role='employee'").bind(email).run();return reply({ok:true});}catch{return fail('تحقق من البريد الإلكتروني.',400);}}

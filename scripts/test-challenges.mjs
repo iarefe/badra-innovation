@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import {sql,load,seedNetwork,seedEmployee,req} from './test-fixture.mjs';
+const lib=await load('lib/challenges.ts'),api=await load('app/api/challenges/route.ts'),work=await load('app/api/workshop/route.ts'),admin=await load('app/api/participation/route.ts');
+seedNetwork();const staff=seedEmployee('001'),other=seedEmployee('002'),third=seedEmployee('003');const example=lib.exampleChallenges[0].challenge;
+const entries=async user=>(await (await api.GET(req(user))).json()).entries;
+const ws=async()=>(await work.GET(req('manager'))).json();
+const add=async(title,submit=true)=>{const r=await api.POST(req(staff,{challenge:{...example,title},submit},'POST',{ip:'198.51.100.1'}));assert.equal(r.status,200,await r.clone().text());return (await r.json()).id;};
+for(const e of lib.exampleChallenges){assert(lib.challengeSchema.safeParse(e.challenge).success);assert.equal(lib.explorationQuestions(e.challenge).length,3);}
+assert.equal((await api.POST(req(null,{challenge:example,submit:true}))).status,401);
+assert.equal((await api.POST(req(staff,{challenge:{...example,situation:'x'},submit:true}))).status,400);
+assert.equal((await api.POST(req(staff,{challenge:example,submit:true},'POST',{origin:'https://evil.test'}))).status,403);
+const draftId=await add('مسودة خاصة قبل النشر المباشر',false);
+assert.equal((await entries()).length,0);assert.equal((await entries(other)).length,0);assert.equal((await entries(staff)).length,1);
+assert.equal((await api.POST(req(other,{id:draftId,challenge:example,submit:true}))).status,403);
+assert.equal((await api.POST(req(staff,{id:draftId,challenge:example,submit:true}))).status,200);
+assert.equal((await entries()).find(e=>e.id===draftId).status,'published');
+assert(sql.prepare('SELECT published_at FROM challenges WHERE id=?').get(draftId).published_at>0);
+const id=await add('تحدي واقعي ينشر مباشرة عند التسليم');
+assert.equal((await entries()).length,2);assert.equal((await entries(other)).length,2);
+assert.equal((await entries(staff)).find(e=>e.id===id).status,'published');
+assert.equal((await api.PATCH(req('manager',{id,action:'approve'},'PATCH'))).status,400,'Review actions are retired');
+assert.equal((await api.POST(req(staff,{id,challenge:example,submit:true}))).status,409);
+assert.equal((await api.PATCH(req(null,{id,action:'vote',active:true},'PATCH'))).status,401);
+assert.equal((await api.PATCH(req(other,{id,action:'vote',active:true},'PATCH',{ip:'198.51.100.1'}))).status,200);
+for(let i=0;i<2;i++)assert.equal((await api.PATCH(req(other,{id,action:'vote',active:true},'PATCH'))).status,200);
+assert.equal((await entries('manager')).find(e=>e.id===id).votes,1);
+// Legacy votes remain stored but are not counted in the employee election.
+sql.prepare('INSERT INTO challenge_votes(challenge_id,user_id) VALUES(?,?)').run(id,'guest:legacy');assert.equal((await entries('manager')).find(e=>e.id===id).votes,1);
+const ids=[id];for(let i=1;i<5;i++){const x=await add('تحدي جديد لاختبار ترتيب الهاكاثون '+i);ids.push(x);}
+await api.PATCH(req(third,{id:ids[4],action:'vote',active:true},'PATCH'));await api.PATCH(req(other,{id:ids[4],action:'vote',active:true},'PATCH'));
+assert.equal((await ws()).selected[0].id,ids[4]);assert.equal((await ws()).selected.length,3);
+let s=await ws();assert.equal((await work.POST(req(staff,{action:'configure',count:4,revision:s.revision}))).status,403);
+assert.equal((await work.POST(req('manager',{action:'configure',count:4,title:'هاكاثون الاختبار',revision:s.revision}))).status,200);assert.equal((await ws()).selected.length,4);
+assert.equal((await work.POST(req('manager',{action:'configure',count:5,revision:0}))).status,409);
+s=await ws();assert.equal((await work.POST(req('manager',{action:'pause',revision:s.revision}))).status,200);assert.equal((await ws()).finalized,false);
+assert.equal((await api.PATCH(req(third,{id,action:'vote',active:true},'PATCH'))).status,409);
+assert.equal((await api.PATCH(req(other,{id,action:'vote',active:false},'PATCH'))).status,409);
+s=await ws();assert.equal((await work.POST(req('manager',{action:'resume',revision:s.revision}))).status,200);
+s=await ws();assert.equal((await work.POST(req('manager',{action:'configure',count:5,revision:s.revision}))).status,200);
+s=await ws();assert.equal((await work.POST(req('manager',{action:'finalize',revision:s.revision}))).status,200);s=await ws();assert(s.finalized&&!s.open);assert.equal(s.selected.length,5);assert.equal(s.selected[0].votes,2);
+assert.equal((await api.PATCH(req(staff,{id,action:'withdraw'},'PATCH'))).status,409);
+assert.equal((await api.PATCH(req(other,{id,action:'vote',active:false},'PATCH'))).status,409);
+s=await ws();assert.equal((await work.POST(req('manager',{action:'reopen',revision:s.revision}))).status,200);
+assert.equal((await api.PATCH(req(staff,{id,action:'withdraw'},'PATCH'))).status,200);assert.equal((await entries('manager')).find(e=>e.id===id).votes,0);
+assert.equal((await admin.GET(req(other))).status,403);
+const oldPayload={...example};for(const key of Object.keys(lib.challengeExtras))delete oldPayload[key];assert(lib.challengeSchema.safeParse(oldPayload).success);assert(lib.challengeBrief(oldPayload).includes('لم يُستكمل وصف الاحتياج بعد.'));
+assert.equal((await api.POST(req(staff,{challenge:{...example,need:''},submit:true}))).status,400);
+const extended={...example,scope:'داخلي وخارجي',need:'معرفة حالة الطلب والخطوة التالية بوضوح.',assumptions:'قد تكون نقاط التسليم غير واضحة؛ يحتاج ذلك إلى تحقق.',inScope:'رحلة متابعة الطلب\nالتواصل مع الطرفين',outOfScope:'إعادة بناء الأنظمة كافة',criteria:'سهولة الاستخدام\nوضوح الخطوة التالية',question:'كيف يمكننا تمكين الطرفين من متابعة الطلب بوضوح؟'};
+const added=await api.POST(req(staff,{challenge:extended,submit:true}));assert.equal(added.status,200);const dossierId=(await added.json()).id;const saved=(await entries(staff)).find(e=>e.id===dossierId).challenge;
+for(const key of ['need','assumptions','inScope','outOfScope','criteria','question']){assert.equal(saved[key],extended[key]);assert(lib.challengeBrief(saved).includes(extended[key]));}
+assert.equal(saved.author,'موظف الاختبار 001');
+console.log('PASS: verified account gate; participation from any network; ownership; direct publication; private drafts; employee-only unique votes; legacy data preservation; pause/resume; ranking and snapshot; new/legacy challenge fields.');sql.close();

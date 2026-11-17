@@ -1,0 +1,27 @@
+// The actual hook, with only hook storage, elapsed time and browser events supplied by this fixture.
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),wr=createRequire(require.resolve('wrangler/package.json'));
+let last,cleanup=[],effects=[];
+const react={createContext:()=>({}),useRef:current=>({current}),useState:fn=>[last=fn(),v=>{last=v}],useEffect:callback=>effects.push(callback)};
+const outcome=await wr('esbuild').build({stdin:{contents:"export {useLiveIntake} from './app/components/intake-state';export {intakeWindow,intakeClosesAt} from './lib/hackathon-intake'",resolveDir:process.cwd()},bundle:true,format:'cjs',platform:'node',write:false,external:['react']});
+const m={exports:{}};new Function('require','module','exports',outcome.outputFiles[0].text)((id)=>id==='react'?react:require(id),m,m.exports);
+const {useLiveIntake,intakeWindow,intakeClosesAt}=m.exports;
+let wall=4_000,perf=100,id=0,fetches=0,offer=null;const timers=new Map(),intervals=new Map();
+globalThis.document=Object.assign(new EventTarget(),{hidden:false});globalThis.window=new EventTarget();
+Date.now=()=>wall;Object.defineProperty(globalThis,'performance',{value:{now:()=>perf},configurable:true});
+globalThis.setTimeout=(cb,ms)=>{const key=++id;timers.set(key,{cb,at:perf+ms});return key};globalThis.clearTimeout=k=>timers.delete(k);
+globalThis.setInterval=cb=>{const key=++id;intervals.set(key,cb);return key};globalThis.clearInterval=k=>intervals.delete(k);
+globalThis.fetch=async()=>{fetches++;return offer?{ok:true,json:async()=>offer}:{ok:false}};
+const mount=(seed,poll)=>{useLiveIntake(seed,undefined,poll);cleanup=effects.map(fn=>fn()).filter(Boolean);effects=[]};
+const unmount=()=>{cleanup.forEach(fn=>fn());cleanup=[];assert.equal(timers.size,0);assert.equal(intervals.size,0)};
+const advance=ms=>{wall+=ms;perf+=ms;for(const [k,t] of Array.from(timers)){if(t.at<=perf){timers.delete(k);t.cb()}}};
+const flush=async()=>{for(let i=0;i<6;i++)await Promise.resolve()};
+mount(intakeWindow({},intakeClosesAt-2000),true);assert.equal(last.phase,'open');
+advance(1999);assert.equal(last.phase,'open');advance(12);assert.equal(last.phase,'ended');assert.equal(fetches,0,'The open tab closes offline without a poll or a reload');unmount();
+mount(intakeWindow({},intakeClosesAt-60000),true);
+offer=intakeWindow({intake_paused:1,open:1},intakeClosesAt-50000);window.dispatchEvent(new Event('focus'));await flush();assert.equal(last.phase,'paused');assert.equal(last.votingOpen,true);
+offer=intakeWindow({intake_paused:0,open:1},intakeClosesAt-49000);window.dispatchEvent(new Event('badra:intake-changed'));await flush();assert.equal(last.phase,'open');
+offer=intakeWindow({},intakeClosesAt-55000);window.dispatchEvent(new Event('focus'));await flush();assert(last.serverNow>=intakeClosesAt-49000,'Older replies cannot resurrect a past state');
+document.hidden=true;wall+=70000;document.hidden=false;offer=null;document.dispatchEvent(new Event('visibilitychange'));await flush();assert.equal(last.phase,'ended','Returning from sleep uses actual elapsed time');unmount();
+console.log('PASS: open tab closes at the Riyadh boundary offline, foreground updates, independent manual pause/resume, stale feed ignored, tab sleep and timer cleanup.');

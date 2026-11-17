@@ -1,0 +1,1 @@
+ALTER TABLE `workshop_settings` ADD `intake_paused` integer DEFAULT 0 NOT NULL;

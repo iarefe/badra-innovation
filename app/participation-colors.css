@@ -1,0 +1,67 @@
+/* Stable identifiers keep each meaning consistent in registration, accounts and administration. */
+[data-br-role="challenger"] { --br-ink: #894019; --br-tint: #fff0e3; --br-edge: #e7ba96; }
+[data-br-role="innovator"]  { --br-ink: #624095; --br-tint: #f1ebfb; --br-edge: #d2bdeb; }
+[data-br-role="developer"]  { --br-ink: #244f82; --br-tint: #e8f2fc; --br-edge: #b4cce7; }
+[data-br-role="creative"]   { --br-ink: #8d355d; --br-tint: #fbeaf1; --br-edge: #e9b8cb; }
+
+[data-br-state="challenge-published"] { --br-ink: #355b37; --br-tint: #e8f2e3; --br-edge: #bfd4b7; }
+[data-br-state="challenge-draft"]     { --br-ink: #665233; --br-tint: #f4ede0; --br-edge: #d9cbae; }
+[data-br-state="challenge-pending"]   { --br-ink: #344b83; --br-tint: #e9eef9; --br-edge: #bdc9e8; }
+[data-br-state="challenge-returned"]  { --br-ink: #8f4328; --br-tint: #fae9de; --br-edge: #e9b69e; }
+
+[data-br-state="record-confirmed"]    { --br-ink: #17614f; --br-tint: #dff3e9; --br-edge: #abd6c3; }
+[data-br-state="record-self-entered"] { --br-ink: #694b79; --br-tint: #f2eaf6; --br-edge: #d6bedf; }
+[data-br-state="record-awaiting"]     { --br-ink: #775306; --br-tint: #fff1cb; --br-edge: #e6cd8e; }
+[data-br-state="record-unregistered"] { --br-ink: #495568; --br-tint: #eceff3; --br-edge: #c9cfd9; }
+[data-br-state="account-active"]      { --br-ink: #175a68; --br-tint: #e1f2f3; --br-edge: #b4d7da; }
+[data-br-state="account-suspended"]   { --br-ink: #9a3427; --br-tint: #fdece7; --br-edge: #ecbcb3; }
+
+:is(.ba-phase, .ba-vote-status, .ba-phase-value)[data-phase="open"]   { --br-ink: #3b6445; --br-tint: #edf4e9; --br-edge: #c2d6bc; }
+:is(.ba-phase, .ba-vote-status, .ba-phase-value)[data-phase="paused"] { --br-ink: #904a20; --br-tint: #fbf1e7; --br-edge: #e5c1a5; }
+:is(.ba-phase, .ba-vote-status, .ba-phase-value)[data-phase="final"]  { --br-ink: #23484a; --br-tint: #e6efed; --br-edge: #bbd2cc; }
+
+.br-role-badge[data-br-role], .br-status-badge[data-br-state], .cd-tags > .br-status-badge[data-br-state] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35em;
+  padding: 2px 9px;
+  border: 1px solid var(--br-edge);
+  border-radius: 999px;
+  background: var(--br-tint);
+  color: var(--br-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.65;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.br-status-badge[data-br-state], .cd-tags > .br-status-badge[data-br-state] { border-radius: 7px; }
+:is(.br-role-badge, .br-status-badge) > svg { flex: none; stroke-width: 1.9; }
+.br-role-list, :is(.cd-members-dialog, .engagement-lists) li .br-role-list {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; max-width: 100%; vertical-align: middle;
+}
+:is(.cd-members-dialog, .engagement-lists) li .br-role-list { display: flex; margin-block-start: 5px; }
+.br-no-roles { color: #5f6b68; font-size: 13px; }
+
+.role-picker label[data-br-role] input { accent-color: var(--br-ink); }
+.role-picker label.chosen[data-br-role] { background: var(--br-tint); border-color: var(--br-ink); box-shadow: none; }
+.role-picker label[data-br-role]:has(input:focus-visible) { outline-color: var(--br-ink); }
+.role-picker label[data-br-role] small, .member-role-cards > [data-br-role] p { color: #485653; font-size: 13px; }
+.member-role-cards > [data-br-role] { background: #fff; border-color: var(--br-edge); border-inline-start: 3px solid var(--br-ink); }
+.member-role-cards .br-role-badge[data-br-role] { font-size: 15px; }
+
+.ba-pills button[data-br-state]::before {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin-inline-end: 5px;
+  border-radius: 50%; background: var(--br-ink); vertical-align: middle;
+}
+.ba-pills button[data-br-state][aria-pressed="true"] { background: var(--br-tint); color: var(--br-ink); border-color: var(--br-ink); }
+:is(.ba-phase, .ba-vote-status)[data-phase] { background: var(--br-tint); border-color: var(--br-edge); }
+:is(.ba-phase, .ba-vote-status)[data-phase] strong { color: var(--br-ink); }
+:is(.ba-phase, .ba-vote-status)[data-phase] .ba-dot { background: var(--br-ink); }
+.ba-tabs button[aria-selected="false"] .ba-phase-value { color: var(--br-ink); }
+.ba-table-scroll tbody tr[data-inactive="true"] { --ba-op: 1; opacity: 1; background: #f6f6f3; color: #5f6b68; }
+
+@media (forced-colors: active) {
+  .role-picker label.chosen[data-br-role], .ba-pills button[data-br-state][aria-pressed="true"] { border: 2px solid Highlight; }
+}

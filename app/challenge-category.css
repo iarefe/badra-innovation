@@ -1,0 +1,21 @@
+.category-edit{display:inline-flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;padding:0;border:1px solid transparent;border-radius:10px;background:transparent;color:#c4692f;cursor:pointer}
+.category-edit:hover:not(:disabled){background:#fbf1e7;border-color:#e8c3a6}
+.category-edit:disabled{opacity:.55;cursor:not-allowed}
+.category-tag{color:#5f6b68;font-size:13px}
+.category-dialog{box-sizing:border-box;width:min(480px,calc(100% - 24px));max-width:calc(100% - 24px);max-height:calc(100dvh - 32px);margin:auto;padding:24px;border:1px solid #e6e8e1;border-radius:20px;background:#fafaf7;color:#1d2b2a;box-shadow:none;overflow-y:auto;font:400 15px/1.8 "Dossier Plex","IBM Plex Sans Arabic",Tahoma,sans-serif;text-align:start}
+.category-dialog::backdrop{background:rgb(29 43 42 / .42)}
+.category-dialog form{display:block;margin:0}
+.category-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 8px}
+.category-dialog h2{margin:0;color:#23484a;font-size:24px;font-weight:600;line-height:1.5}
+.category-dialog .category-title{margin:0 0 22px;font-size:15px;color:#5f6b68;overflow-wrap:anywhere}
+.category-dialog label{display:block;margin:0 0 8px;font-weight:600;color:#1d2b2a}
+.category-dialog select{box-sizing:border-box;width:100%;min-width:0;min-height:48px;padding:10px 12px;border:1px solid #e6e8e1;border-radius:12px;background:#fff;color:#23484a;font:inherit}
+.category-dialog button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 18px;border:1px solid #e6e8e1;border-radius:11px;background:#fff;color:#23484a;font:500 15px/1.5 "Dossier Plex","IBM Plex Sans Arabic",Tahoma,sans-serif;white-space:nowrap;cursor:pointer}
+.category-dialog .category-close{flex-shrink:0;width:44px;padding:8px;background:transparent}
+.category-dialog .category-help{margin:14px 0 0;color:#5f6b68;font-size:14px;line-height:1.8}
+.category-dialog .category-error{margin:14px 0 0;padding:10px 12px;border-radius:10px;color:#b23a2a;background:#fdf1ee;font-size:14px}
+.category-dialog footer{display:flex;flex-wrap:wrap;gap:10px;margin:24px 0 0;padding:0;border:0;background:transparent}
+.category-dialog .category-save{flex:1;background:#23484a;border-color:#23484a;color:#fff}
+.category-dialog button:disabled{opacity:.5;cursor:not-allowed}
+.category-edit:focus-visible,.category-dialog :is(button,select):focus-visible{outline:2px solid #c4692f;outline-offset:3px}
+@media(max-width:600px){.category-dialog{padding:20px}.category-dialog h2{font-size:22px}.category-edit{width:44px;height:44px}}

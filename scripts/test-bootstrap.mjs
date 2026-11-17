@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {sql,load,env,req,seedEmployee} from './test-fixture.mjs';
+const bootstrap=await load('app/api/bootstrap/route.ts'),challenges=await load('app/api/challenges/route.ts'),lib=await load('lib/challenges.ts'),auth=await load('app/api/employee-auth/route.ts');
+const a=seedEmployee('801'),b=seedEmployee('802');
+const added=await challenges.POST(req(a,{challenge:lib.exampleChallenges[0].challenge,submit:false}));const id=(await added.json()).id;
+const original=env.DB.prepare;let sessionReads=0;env.DB.prepare=function(q){if(q.includes('FROM employee_sessions s JOIN employees'))sessionReads++;return original(q)};
+let r=await bootstrap.GET(req(a)),data=await r.json();assert.equal(r.status,200);assert.equal(sessionReads,1,'A bootstrap request reads the session once');assert.match(r.headers.get('cache-control'),/private, no-store/);
+assert.equal(data.account.employee.phone,a.phone);assert.equal(data.entries[0].id,id);assert.equal(data.viewer.employeeId,a.id);assert.equal(data.workshop.open,true);assert(!JSON.stringify(data).includes(a.secret));assert.equal(data.viewer.session,undefined);
+r=await bootstrap.GET(req(b));data=await r.json();assert.equal(data.entries.length,0);assert.equal(data.account.employee.phone,b.phone);assert(!JSON.stringify(data).includes(a.phone));
+r=await bootstrap.GET(req(null));data=await r.json();assert.equal(data.entries.length,0);assert.equal(data.account.employee,null);assert.equal(data.viewer.manager,false);assert(!JSON.stringify(data).includes(a.phone));
+const updated=await auth.POST(req(a,{action:'update-roles',roles:['creative','developer']}));assert.deepEqual((await updated.json()).account.employee.roles,['creative','developer']);
+const logout=await auth.POST(req(a,{action:'logout'}));assert.equal((await logout.json()).account.employee,null);assert.equal((await (await bootstrap.GET(req(a))).json()).account.employee,null);
+assert.equal((await (await bootstrap.GET(req('manager'))).json()).viewer.manager,true);
+sql.close();console.log('PASS: one session read per bootstrap; complete initial data; no-store; private drafts and phone isolation; manager authorization; immediate updated account response; logout invalidation.');
